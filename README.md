@@ -1,4 +1,4 @@
-# Technikerarbeit: Prozessoptimierung der DGUV-V3-Prüfung durch Blockchain-Technologien – Entwicklung eines prototypischen Mess- und DokumentationssystemsZiel dieses Projekts ist die Entwicklung eines prototypischen DGUV-Messsystems auf Basis eines Raspberry Pi, das eine fälschungssichere, benutzerfreundliche und datenschutzkonforme Erfassung sowie Archivierung von Prüfdaten ermöglicht.  
+# Prozessoptimierung der DGUV-V3-Prüfung durch Blockchain-Technologien – Die Entwicklung eines prototypischen Mess- und Dokumentations
 
 Die zentrale Anforderung besteht in der unveränderlichen Speicherung aller Messergebnisse auf der Solana-Blockchain, wodurch eine nachträgliche Manipulation ausgeschlossen wird und die Prüfdaten langfristig nachvollziehbar bleiben.
 
