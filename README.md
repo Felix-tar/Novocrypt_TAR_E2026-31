@@ -22,12 +22,12 @@ Abnahme der Technikerarbeit im Betrieb geplant am **08.04.**
 ## Projektupdates
 
 ### Update – 20.03.2026
-– Das Gehäuse wurde gedruckt und alle Komponenten in das neu Gehäuse eingebaut.
-– Die Beschilderung wurde in Fusion 360 konstruiert, als DXF-Datei exportiert und zur Gravur an die Firma JWF übermittelt.
-– Die Schneiderei Baumann wurde mit der Anfertigung einer Tragetasche zur sicheren Halterung des Geräts beauftragt.
+- Das Gehäuse wurde gedruckt und alle Komponenten in das neu Gehäuse eingebaut.
+- Die Beschilderung wurde in Fusion 360 konstruiert, als DXF-Datei exportiert und zur Gravur an die Firma JWF übermittelt.
+- Die Schneiderei Baumann wurde mit der Anfertigung einer Tragetasche zur sicheren Halterung des Geräts beauftragt.
 
 ### Update – 25.02.2026
-- Abschluss der 3D-Modellierung des Gehäuses  
+- Abschluss der 3D-Modellierung des Gehäuses
 - Übergabe der finalen Druckdateien an JWF für den endgültigen 3D-Druck
 
 
