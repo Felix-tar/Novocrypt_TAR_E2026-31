@@ -10,24 +10,29 @@ Die Bedienung erfolgt über drei einzelne Softwarekomponenten: eine für den Pr�
 
 ### Aktueller Status
 - Software: funktionsfähig und einsatzbereit  
-- Gehäuse: derzeit im 3D-Druck bei der Firma **JWF**  
+– Die Hardware ist fertig montiert. Die Beschriftung muss noch angebracht werden und die Transporttasche befindet sich noch in Fertigung.
 - Dokumentation: Erstellung der Abschlussarbeit aktuell in Bearbeitung  
 
 **Nächstes Update:**  
-Finaler Zusammenbau mit überarbeitetem Gehäuse am **07.03.**  
+Finaler Zusammenbau mit Tasche **21.03.**  
 Abnahme der Technikerarbeit im Betrieb geplant am **08.04.**
 
 ---
 
 ## Projektupdates
 
-### Update – 25.02.2025
+### Update – 20.03.2026
+– Das Gehäuse wurde gedruckt und alle Komponenten in das neu Gehäuse eingebaut.
+– Die Beschilderung wurde in Fusion 360 konstruiert, als DXF-Datei exportiert und zur Gravur an die Firma JWF übermittelt.
+– Die Schneiderei Baumann wurde mit der Anfertigung einer Tragetasche zur sicheren Halterung des Geräts beauftragt.
+
+### Update – 25.02.2026
 - Abschluss der 3D-Modellierung des Gehäuses  
 - Übergabe der finalen Druckdateien an JWF für den endgültigen 3D-Druck
 
 
 
-### Update – 07.01.2025
+### Update – 07.01.2026
 - Integration der Komponenten in das erste 3D-gedruckte Gehäuse  
 - Anpassung der Bildschirmposition sowie Überarbeitung des Gehäusedesigns im CAD-Modell  
 - Erster funktionsfähiger Prototyp aufgebaut  
