@@ -291,7 +291,7 @@
     <!-- Error -->
     <section id="view-error" class="card hidden">
       <h2 class="section" style="color: var(--err);">Fehler</h2>
-      <p id="error-text" class="help" style="margin-top: 0;"></p>
+      <p id="error-text" class="help" style="margin-top: 0; white-space: pre-wrap; font-family: var(--mono); font-size: 12.5px;"></p>
       <div class="btn-row">
         <button class="btn" onclick="location.reload()">Erneut versuchen</button>
         <a class="btn" id="error-solscan" href="#" target="_blank" rel="noopener">Auf Solscan öffnen</a>
@@ -374,10 +374,14 @@
   'use strict';
 
   // ---------- Config ----------
-  const RPC_ENDPOINTS = [
+  // Default fallback chain. Override globally via `?rpc=https://your-endpoint`
+  // (multiple allowed with `?rpc=a&rpc=b`). A custom RPC is tried FIRST.
+  const DEFAULT_RPC_ENDPOINTS = [
     'https://api.mainnet-beta.solana.com',
     'https://solana-rpc.publicnode.com',
-    'https://solana.drpc.org',
+    'https://solana.api.onfinality.io/public',
+    'https://solana-mainnet.g.alchemy.com/v2/demo',
+    'https://endpoints.omniatech.io/v1/sol/mainnet/public',
   ];
   const MEMO_PROGRAM_IDS = new Set([
     'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr', // v2
@@ -433,36 +437,59 @@
 
   // ---------- Core: fetch transaction ----------
   async function loadTx(signature) {
-    let lastErr;
-    for (const url of RPC_ENDPOINTS) {
+    // Build endpoint list: custom ?rpc= first, then defaults.
+    const customRpcs = params.getAll('rpc').map(s => s.trim()).filter(Boolean);
+    const endpoints = [...customRpcs, ...DEFAULT_RPC_ENDPOINTS];
+
+    const failures = [];
+    for (const url of endpoints) {
       try {
         const data = await rpc(url, 'getTransaction', [
           signature,
           { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
         ]);
         if (!data) {
-          lastErr = new Error('Transaktion nicht gefunden (noch nicht bestätigt oder falsche Signatur).');
+          failures.push({ url, msg: 'null (nicht gefunden / noch nicht bestätigt)' });
           continue;
         }
         render(signature, data);
         return;
       } catch (err) {
-        lastErr = err;
-        // try next endpoint
+        failures.push({ url, msg: (err && err.message) ? err.message : String(err) });
       }
     }
-    throw lastErr || new Error('Keine RPC antwortete.');
+    // All endpoints failed or returned null
+    const detail = failures.map(f => '• ' + shortUrl(f.url) + ' → ' + f.msg).join('\n');
+    const localHint = location.protocol === 'file:'
+      ? '\n\nHinweis: Du öffnest die Datei via file:// lokal. In diesem Modus sendet der Browser "Origin: null", was viele öffentliche RPCs blockieren. Deploye die Seite auf GitHub Pages oder teste über einen lokalen HTTP-Server (z.B. `python -m http.server`).'
+      : '';
+    const customHint = '\n\nDu kannst über ?rpc=https://dein-endpoint einen eigenen RPC (z.B. Helius) angeben.';
+    throw new Error('Keine RPC antwortete:\n' + detail + localHint + customHint);
+  }
+
+  function shortUrl(u) {
+    try { return new URL(u).host; } catch { return u; }
   }
 
   async function rpc(url, method, params) {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
-    });
-    if (!res.ok) throw new Error('RPC HTTP ' + res.status + ' @ ' + url);
-    const json = await res.json();
-    if (json.error) throw new Error('RPC Fehler: ' + (json.error.message || JSON.stringify(json.error)));
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+      });
+    } catch (netErr) {
+      throw new Error('Netzwerk-/CORS-Fehler (' + (netErr.message || netErr) + ')');
+    }
+    if (!res.ok) {
+      let body = '';
+      try { body = (await res.text()).slice(0, 140); } catch (_) {}
+      throw new Error('HTTP ' + res.status + (body ? ' – ' + body : ''));
+    }
+    let json;
+    try { json = await res.json(); } catch (_) { throw new Error('Ungültige JSON-Antwort'); }
+    if (json.error) throw new Error('RPC-Error: ' + (json.error.message || JSON.stringify(json.error)));
     return json.result;
   }
 
