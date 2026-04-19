@@ -4,6 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
   <title>Solana Memo Viewer</title>
   <meta name="description" content="Zeigt den Memo-Payload einer Solana-Transaktion an." />
   <style>
@@ -260,7 +263,7 @@
     <header class="site">
       <div class="brand">
         <span class="logo">◎</span>
-        <span>Solana Memo Viewer <small>on-chain payload</small></span>
+        <span>Solana Memo Viewer <small>on-chain payload · v1.1</small></span>
       </div>
       <span id="network-badge" class="badge"><span class="dot"></span>mainnet-beta</span>
     </header>
@@ -441,20 +444,27 @@
     const customRpcs = params.getAll('rpc').map(s => s.trim()).filter(Boolean);
     const endpoints = [...customRpcs, ...DEFAULT_RPC_ENDPOINTS];
 
+    console.info('[MemoViewer v1.1] Signature:', signature);
+    console.info('[MemoViewer v1.1] Endpoints to try:', endpoints);
+
     const failures = [];
     for (const url of endpoints) {
       try {
+        console.info('[MemoViewer] → trying', url);
         const data = await rpc(url, 'getTransaction', [
           signature,
           { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
         ]);
         if (!data) {
+          console.warn('[MemoViewer] ← null from', url);
           failures.push({ url, msg: 'null (nicht gefunden / noch nicht bestätigt)' });
           continue;
         }
+        console.info('[MemoViewer] ✓ got data from', url);
         render(signature, data);
         return;
       } catch (err) {
+        console.warn('[MemoViewer] ✗ failed at', url, '→', err && err.message);
         failures.push({ url, msg: (err && err.message) ? err.message : String(err) });
       }
     }
