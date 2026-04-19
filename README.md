@@ -10,16 +10,26 @@ Die Bedienung erfolgt über drei einzelne Softwarekomponenten: eine für den Pr�
 
 ### Aktueller Status
 - Software: funktionsfähig und einsatzbereit  
-– Die Hardware ist fertig montiert. Die Beschriftung muss noch angebracht werden und die Transporttasche befindet sich noch in Fertigung.
+– Die Hardware ist fertig montiert.
 - Dokumentation: Erstellung der Abschlussarbeit aktuell in Bearbeitung  
 
 **Nächstes Update:**  
-Finaler Zusammenbau mit Tasche **21.03.**  
-Abnahme der Technikerarbeit im Betrieb geplant am **08.04.**
+nach theorieprüfung 
 
 ---
 
 ## Projektupdates
+### Update – 19.04.2026
+Abnahme erfolgreich abgeschlossen, Dokumentation nahezu fertiggestellt.
+
+Weiterentwicklung durch webbasierten Memo-Extractors:
+Umsetzung einer gehosteten HTML-Webseite, die lokal im Browser ausgeführt werden kann.
+Die Übergabe der Transaktions-ID erfolgt dabei direkt über die URL, z. B.:
+
+  https://felix-tar.github.io/Novocrypt_TAR_E2026-31/?sig=2t7wWj1VfTYLFRLXWicFaCTvM3hcdYqFGLavWMo6UdxspTtXRMwNxPUqZR7AiQvNwUCrP3Z4MKoiuprAs87q9VQa
+
+Nächstes Ziel:
+Ablösung von ArDrive durch eine alternative Lösung – entweder über klassische Cloud-Infrastruktur oder durch eine fragmentierte Speicherung direkt auf der Solana-Blockchain.
 
 ### Update – 20.03.2026
 - Das Gehäuse wurde gedruckt und alle Komponenten in das neu Gehäuse eingebaut.
