@@ -1,227 +1,786 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
   <title>Solana Memo Viewer</title>
+  <meta name="description" content="Zeigt den Memo-Payload einer Solana-Transaktion an." />
   <style>
+    :root {
+      --bg: #0b0d10;
+      --surface: #14171c;
+      --surface-2: #1b1f26;
+      --border: #252a33;
+      --text: #e6e8ec;
+      --text-dim: #9aa3b2;
+      --text-mute: #6b7385;
+      --accent: #14f195;       /* Solana green */
+      --accent-2: #9945ff;     /* Solana purple */
+      --ok: #14f195;
+      --warn: #ffb020;
+      --err: #ff5a5f;
+      --code-bg: #0f1217;
+      --radius: 14px;
+      --radius-sm: 8px;
+      --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f6f7f9;
+        --surface: #ffffff;
+        --surface-2: #f0f2f5;
+        --border: #e3e6eb;
+        --text: #111418;
+        --text-dim: #4a5260;
+        --text-mute: #7a8393;
+        --code-bg: #f4f5f7;
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
     body {
-      font-family: Arial, sans-serif;
-      max-width: 1000px;
-      margin: 40px auto;
-      padding: 20px;
+      font-family: var(--sans);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
       line-height: 1.5;
+    }
+
+    .wrap {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 24px 16px 80px;
+    }
+
+    header.site {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 600; letter-spacing: .2px;
+    }
+    .brand .logo {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      display: grid; place-items: center; color: #000; font-weight: 800;
+    }
+    .brand small {
+      color: var(--text-mute); font-weight: 500; margin-left: 2px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    /* status banner */
+    .status-bar {
+      display: flex; flex-wrap: wrap; gap: 12px;
+      align-items: center; justify-content: space-between;
+      padding: 14px 16px; margin-bottom: 16px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 600; letter-spacing: .3px;
+      background: var(--surface-2); color: var(--text-dim);
+      border: 1px solid var(--border);
+    }
+    .badge.ok { background: rgba(20,241,149,.12); color: var(--ok); border-color: rgba(20,241,149,.35); }
+    .badge.err { background: rgba(255,90,95,.12); color: var(--err); border-color: rgba(255,90,95,.35); }
+    .badge.warn { background: rgba(255,176,32,.12); color: var(--warn); border-color: rgba(255,176,32,.35); }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+
+    /* hero (primary value) */
+    .hero {
+      display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: end;
+    }
+    .hero h1 {
+      font-size: 14px; font-weight: 500; color: var(--text-mute);
+      margin: 0 0 6px; text-transform: uppercase; letter-spacing: .8px;
+    }
+    .hero .value {
+      font-family: var(--mono);
+      font-size: clamp(28px, 6vw, 42px);
+      font-weight: 600;
+      line-height: 1.1;
+      color: var(--text);
+    }
+    .hero .unit {
+      font-size: .6em; color: var(--text-dim); margin-left: 6px; font-weight: 500;
+    }
+    .hero .sub {
+      color: var(--text-dim); font-size: 13px; margin-top: 8px;
+      font-family: var(--mono);
+    }
+
+    h2.section {
+      font-size: 12px; text-transform: uppercase; letter-spacing: 1px;
+      color: var(--text-mute); font-weight: 600;
+      margin: 0 0 12px;
+    }
+
+    /* Key / Value grid */
+    .kv {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .kv .cell {
+      background: var(--surface);
+      padding: 10px 12px;
+      min-width: 0;
+    }
+    .kv .k {
+      font-size: 11px; text-transform: uppercase; letter-spacing: .6px;
+      color: var(--text-mute); margin-bottom: 4px;
+    }
+    .kv .v {
+      font-family: var(--mono); font-size: 13px; color: var(--text);
       word-break: break-word;
     }
-    h1 { margin-top: 0; }
-    .muted { color: #666; }
-    .box {
-      border: 1px solid #ccc;
-      border-radius: 10px;
-      padding: 16px;
-      background: #f8f8f8;
-      white-space: pre-wrap;
-      overflow-wrap: anywhere;
+
+    /* Raw code block */
+    pre.code {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 12.5px;
+      line-height: 1.55;
+      color: var(--text);
+      margin: 0;
     }
-    .small {
-      font-size: 14px;
-      color: #666;
+    .tok-key { color: var(--accent-2); }
+    .tok-str { color: var(--accent); }
+    .tok-num { color: #ffb020; }
+    .tok-bool { color: #4aa3ff; }
+    .tok-null { color: var(--text-mute); }
+
+    details.raw {
       margin-top: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
     }
+    details.raw summary {
+      cursor: pointer; padding: 10px 14px;
+      font-size: 13px; color: var(--text-dim);
+      user-select: none; list-style: none;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    details.raw summary::-webkit-details-marker { display: none; }
+    details.raw summary::after {
+      content: "▾"; color: var(--text-mute); transition: transform .2s;
+    }
+    details.raw[open] summary::after { transform: rotate(180deg); }
+    details.raw > div { padding: 0 14px 14px; }
+
+    /* Footer / tx info */
+    .tx-meta {
+      display: grid; gap: 8px; font-size: 13px;
+    }
+    .tx-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+    .tx-row .k { color: var(--text-mute); font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
+    .tx-row .v { font-family: var(--mono); word-break: break-all; text-align: right; flex: 1; min-width: 0; }
+
+    a.link { color: var(--accent); text-decoration: none; }
+    a.link:hover { text-decoration: underline; }
+    .btn-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 8px 14px; border-radius: 8px;
+      background: var(--surface-2); color: var(--text);
+      border: 1px solid var(--border);
+      font-size: 13px; cursor: pointer; text-decoration: none;
+      font-family: var(--sans);
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 600; }
+    .btn.primary:hover { filter: brightness(1.05); color: #000; }
+
+    /* loading skeleton */
+    .skeleton {
+      background: linear-gradient(90deg, var(--surface-2) 0%, var(--border) 50%, var(--surface-2) 100%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 6px;
+      height: 14px;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+    /* input form */
+    .form {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;
+    }
+    .form input {
+      flex: 1; min-width: 0; min-height: 40px;
+      padding: 8px 12px; border-radius: 8px;
+      background: var(--surface-2); color: var(--text);
+      border: 1px solid var(--border);
+      font-family: var(--mono); font-size: 13px;
+    }
+    .form input:focus { outline: none; border-color: var(--accent); }
+
+    .help {
+      color: var(--text-mute); font-size: 13px; margin-top: 10px;
+    }
+    .copy-ok { color: var(--accent); font-size: 12px; margin-left: 8px; }
+
+    footer.site {
+      margin-top: 24px; text-align: center;
+      color: var(--text-mute); font-size: 12px;
+    }
+
+    .hidden { display: none !important; }
   </style>
 </head>
 <body>
-  <h1>Memo-Rohdaten</h1>
-  <p class="muted">Direkte Anzeige der Memo-Daten aus einer Solana-Transaktion.</p>
+  <div class="wrap">
+    <header class="site">
+      <div class="brand">
+        <span class="logo">◎</span>
+        <span>Solana Memo Viewer <small>on-chain payload</small></span>
+      </div>
+      <span id="network-badge" class="badge"><span class="dot"></span>mainnet-beta</span>
+    </header>
 
-  <div id="status">Lade …</div>
-  <div id="memo" class="box" style="display:none;"></div>
-  <div id="meta" class="small"></div>
+    <!-- Landing / no signature -->
+    <section id="view-empty" class="card hidden">
+      <h2 class="section" style="margin-bottom: 6px;">Keine Signatur angegeben</h2>
+      <p class="help" style="margin-top: 0;">
+        Füge eine Solana-Transaktionssignatur an die URL an, z.&nbsp;B.
+        <code style="font-family:var(--mono);">?sig=DEINE_SIG</code>,
+        oder gib sie hier ein:
+      </p>
+      <div class="form">
+        <input id="sig-input" type="text" placeholder="Transaktionssignatur (base58)…" autocomplete="off" spellcheck="false" />
+        <button class="btn primary" id="sig-go">Anzeigen</button>
+      </div>
+    </section>
 
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const sig = params.get("sig");
+    <!-- Loading -->
+    <section id="view-loading" class="card hidden">
+      <div class="skeleton" style="width: 40%; margin-bottom: 14px;"></div>
+      <div class="skeleton" style="width: 80%; height: 30px; margin-bottom: 10px;"></div>
+      <div class="skeleton" style="width: 60%;"></div>
+      <div class="skeleton" style="width: 90%; margin-top: 18px;"></div>
+      <div class="skeleton" style="width: 70%; margin-top: 8px;"></div>
+    </section>
 
-    const statusEl = document.getElementById("status");
-    const memoEl = document.getElementById("memo");
-    const metaEl = document.getElementById("meta");
+    <!-- Error -->
+    <section id="view-error" class="card hidden">
+      <h2 class="section" style="color: var(--err);">Fehler</h2>
+      <p id="error-text" class="help" style="margin-top: 0;"></p>
+      <div class="btn-row">
+        <button class="btn" onclick="location.reload()">Erneut versuchen</button>
+        <a class="btn" id="error-solscan" href="#" target="_blank" rel="noopener">Auf Solscan öffnen</a>
+      </div>
+    </section>
 
-    const RPCS = [
-      "https://api.mainnet-beta.solana.com",
-      "https://rpc.ankr.com/solana"
-    ];
+    <!-- Result -->
+    <section id="view-result" class="hidden">
+      <!-- Status bar -->
+      <div class="status-bar">
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+          <span id="payload-status" class="badge"><span class="dot"></span><span>—</span></span>
+          <span id="payload-kind" class="badge">—</span>
+          <span id="tx-status" class="badge">—</span>
+        </div>
+        <span id="payload-time" class="badge">—</span>
+      </div>
 
-    const MEMO_PROGRAMS = new Set([
-      "MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr",
-      "Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo"
-    ]);
+      <!-- Hero / main value -->
+      <section class="card" id="hero-card">
+        <div class="hero">
+          <div>
+            <h1 id="hero-label">Messwert</h1>
+            <div class="value">
+              <span id="hero-value">—</span><span class="unit" id="hero-unit"></span>
+            </div>
+            <div class="sub" id="hero-sub"></div>
+          </div>
+        </div>
+      </section>
 
-    const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+      <!-- Metadata -->
+      <section class="card">
+        <h2 class="section">Metadaten</h2>
+        <div id="meta-grid" class="kv"></div>
+      </section>
 
-    function base58Decode(str) {
-      if (!str || typeof str !== "string") return new Uint8Array();
+      <!-- Nested details (runtime_test / panel) -->
+      <section class="card hidden" id="details-card">
+        <h2 class="section" id="details-title">Details</h2>
+        <div id="details-grid" class="kv"></div>
+      </section>
 
-      const bytes = [0];
-      for (let i = 0; i < str.length; i++) {
-        const c = str[i];
-        const value = BASE58_ALPHABET.indexOf(c);
-        if (value < 0) throw new Error("Ungültiges Base58-Zeichen: " + c);
+      <!-- Raw memo JSON -->
+      <section class="card">
+        <h2 class="section">Memo Payload</h2>
+        <pre class="code" id="memo-raw">—</pre>
+        <div class="btn-row">
+          <button class="btn" id="copy-memo">Kopieren</button>
+          <span id="copy-memo-ok" class="copy-ok hidden">✓ Kopiert</span>
+        </div>
+      </section>
 
-        let carry = value;
-        for (let j = 0; j < bytes.length; ++j) {
-          carry += bytes[j] * 58;
-          bytes[j] = carry & 0xff;
-          carry >>= 8;
-        }
-        while (carry > 0) {
-          bytes.push(carry & 0xff);
-          carry >>= 8;
-        }
-      }
+      <!-- Transaction info -->
+      <section class="card">
+        <h2 class="section">Transaktion</h2>
+        <div class="tx-meta">
+          <div class="tx-row"><span class="k">Signature</span><span class="v" id="tx-sig">—</span></div>
+          <div class="tx-row"><span class="k">Slot</span><span class="v" id="tx-slot">—</span></div>
+          <div class="tx-row"><span class="k">Block Time</span><span class="v" id="tx-blocktime">—</span></div>
+          <div class="tx-row"><span class="k">Signer</span><span class="v" id="tx-signer">—</span></div>
+          <div class="tx-row"><span class="k">Fee</span><span class="v" id="tx-fee">—</span></div>
+          <div class="tx-row"><span class="k">Memo Program</span><span class="v" id="tx-memo-prog">—</span></div>
+        </div>
+        <div class="btn-row">
+          <a class="btn primary" id="link-solscan" href="#" target="_blank" rel="noopener">Solscan</a>
+          <a class="btn" id="link-explorer" href="#" target="_blank" rel="noopener">Solana Explorer</a>
+          <a class="btn" id="link-solanafm" href="#" target="_blank" rel="noopener">SolanaFM</a>
+        </div>
+      </section>
+    </section>
 
-      for (let i = 0; i < str.length && str[i] === "1"; i++) {
-        bytes.push(0);
-      }
+    <footer class="site">
+      Daten werden live aus dem Solana-Netzwerk über eine öffentliche RPC geladen.
+    </footer>
+  </div>
 
-      return new Uint8Array(bytes.reverse());
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Config ----------
+  const RPC_ENDPOINTS = [
+    'https://api.mainnet-beta.solana.com',
+    'https://solana-rpc.publicnode.com',
+    'https://solana.drpc.org',
+  ];
+  const MEMO_PROGRAM_IDS = new Set([
+    'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr', // v2
+    'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo', // v1
+  ]);
+
+  // ---------- DOM ----------
+  const $ = (id) => document.getElementById(id);
+  const views = {
+    empty:   $('view-empty'),
+    loading: $('view-loading'),
+    error:   $('view-error'),
+    result:  $('view-result'),
+  };
+  const showView = (name) => {
+    for (const k of Object.keys(views)) views[k].classList.toggle('hidden', k !== name);
+  };
+
+  // ---------- URL handling ----------
+  const params = new URLSearchParams(location.search);
+  const sig = (params.get('sig') || params.get('signature') || '').trim();
+
+  // Landing form handler
+  $('sig-go').addEventListener('click', () => {
+    const v = $('sig-input').value.trim();
+    if (v) {
+      const u = new URL(location.href);
+      u.searchParams.set('sig', v);
+      location.href = u.toString();
     }
+  });
+  $('sig-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('sig-go').click(); });
 
-    function utf8FromBytes(bytes) {
-      return new TextDecoder("utf-8", { fatal: false }).decode(bytes);
-    }
+  if (!sig) {
+    showView('empty');
+    return;
+  }
 
-    function extractFromLogs(tx) {
-      const logs = tx?.meta?.logMessages || [];
-      const hits = logs
-        .filter(line => line.includes("Program log: Memo"))
-        .map(line => line.replace(/^.*Program log: Memo[: ]?/, "").trim())
-        .filter(Boolean);
+  // quick sanity: solana signatures are base58, ~87-88 chars
+  if (!/^[1-9A-HJ-NP-Za-km-z]{43,90}$/.test(sig)) {
+    showError('Die übergebene Signatur sieht nicht wie eine gültige Solana-Signatur aus.');
+    return;
+  }
 
-      return hits.length ? hits.join("\n") : null;
-    }
+  // set solscan fallback link
+  $('error-solscan').href = 'https://solscan.io/tx/' + encodeURIComponent(sig);
 
-    function extractFromInstructions(tx) {
-      const msg = tx?.transaction?.message;
-      if (!msg) return null;
+  showView('loading');
+  loadTx(sig).catch((e) => {
+    console.error(e);
+    showError(e && e.message ? e.message : 'Unbekannter Fehler beim Laden der Transaktion.');
+  });
 
-      const accountKeys = msg.accountKeys || [];
-      const instructions = msg.instructions || [];
-
-      for (const ix of instructions) {
-        let programId = null;
-
-        if (typeof ix.programId === "string") {
-          programId = ix.programId;
-        } else if (typeof ix.programIdIndex === "number" && accountKeys[ix.programIdIndex]) {
-          const key = accountKeys[ix.programIdIndex];
-          programId = typeof key === "string" ? key : key.pubkey;
+  // ---------- Core: fetch transaction ----------
+  async function loadTx(signature) {
+    let lastErr;
+    for (const url of RPC_ENDPOINTS) {
+      try {
+        const data = await rpc(url, 'getTransaction', [
+          signature,
+          { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
+        ]);
+        if (!data) {
+          lastErr = new Error('Transaktion nicht gefunden (noch nicht bestätigt oder falsche Signatur).');
+          continue;
         }
-
-        if (!programId || !MEMO_PROGRAMS.has(programId)) continue;
-
-        if (typeof ix.data === "string" && ix.data.length > 0) {
-          try {
-            return utf8FromBytes(base58Decode(ix.data));
-          } catch (e) {
-            return "[Memo-Instruktion gefunden, aber Base58-Decodierung fehlgeschlagen]\n" + ix.data;
-          }
-        }
-
-        if (typeof ix.parsed === "string") {
-          return ix.parsed;
-        }
-      }
-
-      return null;
-    }
-
-    async function fetchTransaction(rpcUrl) {
-      const res = await fetch(rpcUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "getTransaction",
-          params: [
-            sig,
-            {
-              encoding: "json",
-              commitment: "confirmed",
-              maxSupportedTransactionVersion: 0
-            }
-          ]
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status} bei ${rpcUrl}`);
-      }
-
-      const json = await res.json();
-
-      if (json.error) {
-        throw new Error(`${rpcUrl}: ${json.error.message || "RPC-Fehler"}`);
-      }
-
-      return json.result;
-    }
-
-    async function loadMemo() {
-      if (!sig) {
-        statusEl.textContent = "Fehler: Keine Signatur angegeben. Verwende ?sig=...";
+        render(signature, data);
         return;
+      } catch (err) {
+        lastErr = err;
+        // try next endpoint
       }
-
-      let tx = null;
-      let usedRpc = null;
-      let lastError = null;
-
-      for (const rpc of RPCS) {
-        try {
-          const result = await fetchTransaction(rpc);
-          if (result) {
-            tx = result;
-            usedRpc = rpc;
-            break;
-          }
-        } catch (err) {
-          lastError = err;
-        }
-      }
-
-      if (!tx) {
-        statusEl.textContent = "Transaktion konnte über die getesteten RPC-Endpunkte nicht geladen werden.";
-        metaEl.textContent = lastError ? String(lastError) : "Kein Ergebnis erhalten.";
-        return;
-      }
-
-      const memoFromInstruction = extractFromInstructions(tx);
-      const memoFromLogs = extractFromLogs(tx);
-      const memo = memoFromInstruction || memoFromLogs;
-
-      if (!memo) {
-        statusEl.textContent = "Transaktion geladen, aber kein Memo gefunden.";
-        metaEl.textContent = `RPC: ${usedRpc}`;
-        return;
-      }
-
-      statusEl.textContent = "Memo gefunden:";
-      memoEl.style.display = "block";
-      memoEl.textContent = memo;
-
-      const slot = tx.slot ?? "-";
-      const blockTime = tx.blockTime
-        ? new Date(tx.blockTime * 1000).toLocaleString("de-DE")
-        : "-";
-
-      metaEl.textContent = `RPC: ${usedRpc} | Slot: ${slot} | Zeit: ${blockTime}`;
     }
+    throw lastErr || new Error('Keine RPC antwortete.');
+  }
 
-    loadMemo().catch(err => {
-      statusEl.textContent = "Fehler beim Laden.";
-      metaEl.textContent = String(err);
+  async function rpc(url, method, params) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
     });
-  </script>
+    if (!res.ok) throw new Error('RPC HTTP ' + res.status + ' @ ' + url);
+    const json = await res.json();
+    if (json.error) throw new Error('RPC Fehler: ' + (json.error.message || JSON.stringify(json.error)));
+    return json.result;
+  }
+
+  // ---------- Rendering ----------
+  function render(signature, tx) {
+    showView('result');
+
+    // --- tx meta ---
+    $('tx-sig').textContent = signature;
+    $('tx-slot').textContent = tx.slot != null ? String(tx.slot) : '—';
+    $('tx-blocktime').textContent = tx.blockTime
+      ? new Date(tx.blockTime * 1000).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'medium' }) +
+        ' (UTC ' + new Date(tx.blockTime * 1000).toISOString() + ')'
+      : '—';
+    const signer = tx?.transaction?.message?.accountKeys?.find(a => a.signer)?.pubkey
+                || tx?.transaction?.message?.accountKeys?.[0]?.pubkey || '—';
+    $('tx-signer').textContent = signer;
+    const fee = tx?.meta?.fee;
+    $('tx-fee').textContent = fee != null ? (fee / 1e9).toFixed(9) + ' SOL (' + fee + ' lamports)' : '—';
+
+    // tx success badge
+    const ok = tx?.meta?.err == null;
+    const txStatus = $('tx-status');
+    txStatus.className = 'badge ' + (ok ? 'ok' : 'err');
+    txStatus.innerHTML = '<span class="dot"></span>' + (ok ? 'Erfolgreich' : 'Fehlgeschlagen');
+
+    // explorer links
+    $('link-solscan').href    = 'https://solscan.io/tx/' + encodeURIComponent(signature);
+    $('link-explorer').href   = 'https://explorer.solana.com/tx/' + encodeURIComponent(signature);
+    $('link-solanafm').href   = 'https://solana.fm/tx/' + encodeURIComponent(signature);
+
+    // --- find memo(s) ---
+    const memos = extractMemos(tx);
+    if (memos.length === 0) {
+      $('tx-memo-prog').textContent = '—';
+      $('memo-raw').textContent = 'Kein Memo in dieser Transaktion gefunden.';
+      $('hero-label').textContent = 'Kein Memo';
+      $('hero-value').textContent = '—';
+      $('payload-kind').textContent = 'no-memo';
+      $('payload-time').textContent = $('tx-blocktime').textContent;
+      $('payload-status').innerHTML = '<span class="dot"></span>—';
+      $('meta-grid').innerHTML = '<div class="cell"><div class="k">Info</div><div class="v">In dieser Transaktion ist keine SPL-Memo-Instruction enthalten.</div></div>';
+      return;
+    }
+
+    const memo = memos[0]; // primary
+    $('tx-memo-prog').textContent = memo.programId + (memos.length > 1 ? '  (+' + (memos.length - 1) + ' weitere)' : '');
+
+    // Try parse JSON
+    let parsed = null;
+    try { parsed = JSON.parse(memo.text); } catch (_) { /* not JSON */ }
+
+    // raw display with syntax highlight if JSON
+    if (parsed !== null && typeof parsed === 'object') {
+      $('memo-raw').innerHTML = highlightJSON(JSON.stringify(parsed, null, 2));
+    } else {
+      $('memo-raw').textContent = memo.text;
+    }
+
+    // copy
+    $('copy-memo').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(memo.text);
+        const ok = $('copy-memo-ok');
+        ok.classList.remove('hidden');
+        setTimeout(() => ok.classList.add('hidden'), 1500);
+      } catch (_) { /* ignore */ }
+    };
+
+    // structured rendering
+    if (parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      renderStructured(parsed);
+    } else {
+      // treat as plain text payload
+      $('hero-label').textContent = 'Memo';
+      $('hero-value').textContent = truncate(memo.text, 60);
+      $('hero-unit').textContent = '';
+      $('hero-sub').textContent = '';
+      $('payload-kind').textContent = 'text';
+      $('payload-status').innerHTML = '<span class="dot"></span>plain text';
+      $('payload-time').textContent = $('tx-blocktime').textContent;
+      $('meta-grid').innerHTML = '<div class="cell"><div class="k">Länge</div><div class="v">' + memo.text.length + ' Zeichen</div></div>';
+    }
+  }
+
+  function extractMemos(tx) {
+    const out = [];
+    const msg = tx?.transaction?.message;
+    if (!msg) return out;
+
+    const walk = (instructions, parentIdx) => {
+      if (!Array.isArray(instructions)) return;
+      for (const ix of instructions) {
+        const pid = ix.programId || ix.program;
+        if (!pid) continue;
+        // jsonParsed: for memo, ix.parsed is the memo string; ix.program === 'spl-memo'
+        if (MEMO_PROGRAM_IDS.has(ix.programId) || ix.program === 'spl-memo') {
+          let text = '';
+          if (typeof ix.parsed === 'string') text = ix.parsed;
+          else if (ix.parsed && typeof ix.parsed === 'object') text = JSON.stringify(ix.parsed);
+          else if (typeof ix.data === 'string') {
+            // base58-encoded raw bytes; attempt utf-8 decode
+            try { text = utf8FromBase58(ix.data); } catch { text = ix.data; }
+          }
+          out.push({ programId: ix.programId || 'spl-memo', text });
+        }
+      }
+    };
+
+    walk(msg.instructions);
+    // inner instructions (CPIs)
+    if (Array.isArray(tx?.meta?.innerInstructions)) {
+      for (const inner of tx.meta.innerInstructions) walk(inner.instructions);
+    }
+    return out;
+  }
+
+  // ---------- Structured rendering for measurement-style payloads ----------
+  function renderStructured(obj) {
+    // heuristics tuned for the measurement payload shape but generic enough for any object
+    const get = (k) => (k in obj ? obj[k] : undefined);
+
+    // status badge
+    const okField = get('ok');
+    const statusBadge = $('payload-status');
+    if (okField === true) {
+      statusBadge.className = 'badge ok';
+      statusBadge.innerHTML = '<span class="dot"></span>OK';
+    } else if (okField === false) {
+      statusBadge.className = 'badge err';
+      statusBadge.innerHTML = '<span class="dot"></span>NICHT OK';
+    } else {
+      statusBadge.className = 'badge';
+      statusBadge.innerHTML = '<span class="dot"></span>—';
+    }
+
+    // kind/type
+    const kindLabel = [get('nt'), get('kind'), get('bmk')].filter(Boolean).join(' · ') || 'Memo';
+    $('payload-kind').textContent = kindLabel;
+
+    // timestamp
+    const ts = get('ts');
+    if (ts) {
+      const d = new Date(ts);
+      $('payload-time').textContent = isNaN(d) ? ts : d.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'medium' });
+    } else {
+      $('payload-time').textContent = '—';
+    }
+
+    // hero
+    const bmk = get('bmk') || get('nt') || get('kind') || 'Wert';
+    $('hero-label').textContent = humanize(String(bmk));
+    const val = pickValue(obj);
+    $('hero-value').textContent = formatNumber(val.value);
+    $('hero-unit').textContent  = val.unit ? ' ' + val.unit : '';
+    const limit = get('limit');
+    if (limit != null && val.value != null) {
+      $('hero-sub').textContent = 'Grenzwert: ' + formatNumber(limit) + (val.unit ? ' ' + val.unit : '') +
+        ' · Raw: ' + formatNumber(get('raw_val'));
+    } else if (get('raw_val') != null && get('raw_val') !== val.value) {
+      $('hero-sub').textContent = 'Raw: ' + formatNumber(get('raw_val'));
+    } else {
+      $('hero-sub').textContent = '';
+    }
+
+    // metadata grid: everything scalar at top-level except the hero-ish fields
+    const topSkip = new Set(['val','raw_val','unit','limit','ok','ts','bmk','nt','kind','panel','runtime_test']);
+    const metaEntries = [];
+    for (const [k, v] of Object.entries(obj)) {
+      if (topSkip.has(k)) continue;
+      if (v === null || typeof v !== 'object') metaEntries.push([k, v]);
+    }
+    // re-inject important ones in nice order at the top
+    const ordered = [];
+    const push = (label, v) => { if (v !== undefined && v !== null && v !== '') ordered.push([label, v]); };
+    push('Ort',       get('ort'));
+    push('Node-ID',   get('nid'));
+    push('Mess-ID',   get('mid'));
+    push('Version',   get('v'));
+    ordered.push(...metaEntries.map(([k,v]) => [humanize(k), v]));
+
+    $('meta-grid').innerHTML = ordered.map(([k,v]) => cellHTML(k, v)).join('') || '<div class="cell"><div class="k">—</div><div class="v">—</div></div>';
+
+    // Nested details: prefer runtime_test, fall back to panel or any object-valued field
+    const detailsCard = $('details-card');
+    const detailsGrid = $('details-grid');
+    const detailsTitle = $('details-title');
+    const nested = get('runtime_test') || get('panel') || firstObject(obj);
+    if (nested && typeof nested === 'object' && Object.keys(nested).length) {
+      detailsCard.classList.remove('hidden');
+      detailsTitle.textContent = get('runtime_test') ? 'Runtime-Test' : (get('panel') ? 'Panel' : 'Details');
+      detailsGrid.innerHTML = Object.entries(nested)
+        .map(([k,v]) => cellHTML(humanize(k), v))
+        .join('');
+    } else {
+      detailsCard.classList.add('hidden');
+    }
+  }
+
+  function firstObject(obj) {
+    for (const v of Object.values(obj)) {
+      if (v && typeof v === 'object' && !Array.isArray(v)) return v;
+    }
+    return null;
+  }
+
+  function pickValue(obj) {
+    // prefer val if non-zero, else raw_val
+    const unit = obj.unit || '';
+    const val = obj.val;
+    const raw = obj.raw_val;
+    if (typeof val === 'number' && val !== 0) return { value: val, unit };
+    if (typeof raw === 'number') return { value: raw, unit };
+    if (typeof val === 'number') return { value: val, unit };
+    return { value: val ?? raw ?? null, unit };
+  }
+
+  function cellHTML(k, v) {
+    return '<div class="cell"><div class="k">' + escapeHtml(String(k)) + '</div><div class="v">' + formatCellValue(v) + '</div></div>';
+  }
+
+  function formatCellValue(v) {
+    if (v === null || v === undefined) return '—';
+    if (typeof v === 'boolean') return v ? '<span style="color:var(--ok)">true</span>' : '<span style="color:var(--err)">false</span>';
+    if (typeof v === 'number') return escapeHtml(formatNumber(v));
+    if (typeof v === 'string') {
+      // ISO timestamp?
+      if (/^\d{4}-\d{2}-\d{2}T/.test(v)) {
+        const d = new Date(v);
+        if (!isNaN(d)) return escapeHtml(d.toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'medium' }));
+      }
+      return escapeHtml(v) || '<span style="color:var(--text-mute)">(leer)</span>';
+    }
+    if (Array.isArray(v)) return escapeHtml(JSON.stringify(v));
+    return escapeHtml(JSON.stringify(v));
+  }
+
+  function humanize(k) {
+    const dict = {
+      v: 'Version', nt: 'Messart', bmk: 'Messwert', ort: 'Ort', nid: 'Node-ID', mid: 'Mess-ID',
+      kind: 'Art', val: 'Wert', raw_val: 'Rohwert', unit: 'Einheit', ts: 'Zeitstempel',
+      limit: 'Grenzwert', ok: 'Status',
+      measurement_index: 'Messindex', elapsed_seconds: 'Verstrichene Sekunden',
+      duration_minutes: 'Dauer (Minuten)', cpu_temp_c: 'CPU-Temp (°C)',
+      current_a: 'Strom (A)', v_source_v: 'U_Quelle (V)', v_shunt_v: 'U_Shunt (V)',
+      status: 'Status',
+    };
+    if (dict[k]) return dict[k];
+    return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function formatNumber(n) {
+    if (n === null || n === undefined) return '—';
+    if (typeof n !== 'number') return String(n);
+    if (!isFinite(n)) return String(n);
+    // avoid ugly scientific notation for small / typical values
+    if (Math.abs(n) >= 1e6 || (Math.abs(n) < 1e-4 && n !== 0)) return n.toExponential(4);
+    // trim trailing zeros
+    const fixed = Number.isInteger(n) ? String(n) : n.toString();
+    return fixed;
+  }
+
+  function truncate(s, n) {
+    if (!s) return '';
+    return s.length > n ? s.slice(0, n - 1) + '…' : s;
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ---------- JSON syntax highlighting ----------
+  function highlightJSON(json) {
+    return escapeHtml(json).replace(
+      /("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)/g,
+      (match) => {
+        let cls = 'tok-num';
+        if (/^"/.test(match)) {
+          cls = /:$/.test(match) ? 'tok-key' : 'tok-str';
+        } else if (/true|false/.test(match)) cls = 'tok-bool';
+        else if (/null/.test(match)) cls = 'tok-null';
+        return '<span class="' + cls + '">' + match + '</span>';
+      }
+    );
+  }
+
+  // ---------- Base58 decode (fallback for raw memo data) ----------
+  const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  function base58Decode(str) {
+    const map = {};
+    for (let i = 0; i < BASE58_ALPHABET.length; i++) map[BASE58_ALPHABET[i]] = i;
+    let bytes = [0];
+    for (const ch of str) {
+      if (!(ch in map)) throw new Error('Invalid base58 char: ' + ch);
+      let carry = map[ch];
+      for (let j = 0; j < bytes.length; j++) {
+        carry += bytes[j] * 58;
+        bytes[j] = carry & 0xff;
+        carry >>= 8;
+      }
+      while (carry) { bytes.push(carry & 0xff); carry >>= 8; }
+    }
+    for (const ch of str) { if (ch === '1') bytes.push(0); else break; }
+    return new Uint8Array(bytes.reverse());
+  }
+  function utf8FromBase58(s) {
+    const bytes = base58Decode(s);
+    return new TextDecoder('utf-8').decode(bytes);
+  }
+
+  // ---------- Error helper ----------
+  function showError(msg) {
+    $('error-text').textContent = msg;
+    showView('error');
+  }
+})();
+</script>
 </body>
 </html>
