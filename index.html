@@ -263,7 +263,7 @@
     <header class="site">
       <div class="brand">
         <span class="logo">◎</span>
-        <span>Solana Memo Viewer <small>on-chain payload · v1.1</small></span>
+        <span>Solana Memo Viewer <small>on-chain payload · v1.2</small></span>
       </div>
       <span id="network-badge" class="badge"><span class="dot"></span>mainnet-beta</span>
     </header>
@@ -377,15 +377,23 @@
   'use strict';
 
   // ---------- Config ----------
-  // Default fallback chain. Override globally via `?rpc=https://your-endpoint`
+  // Default fallback chain per cluster. Override globally via `?rpc=https://your-endpoint`
   // (multiple allowed with `?rpc=a&rpc=b`). A custom RPC is tried FIRST.
-  const DEFAULT_RPC_ENDPOINTS = [
-    'https://api.mainnet-beta.solana.com',
-    'https://solana-rpc.publicnode.com',
-    'https://solana.api.onfinality.io/public',
-    'https://solana-mainnet.g.alchemy.com/v2/demo',
-    'https://endpoints.omniatech.io/v1/sol/mainnet/public',
-  ];
+  // Also: ?cluster=mainnet|devnet|testnet controls which set is tried.
+  // `all` (default) tries mainnet first, then devnet, then testnet – so a test-tx on devnet
+  // still gets found without the user having to know the cluster.
+  const CLUSTER_ENDPOINTS = {
+    mainnet: [
+      'https://mainnet.helius-rpc.com/?api-key=a9469c6f-61bd-41d8-b739-9fb73adea245
+      'https://solana-rpc.publicnode.com',
+      'https://api.mainnet-beta.solana.com',
+      'https://solana.api.onfinality.io/public',
+      'https://solana-mainnet.g.alchemy.com/v2/demo',
+      'https://endpoints.omniatech.io/v1/sol/mainnet/public',
+    ],
+    devnet:  ['https://api.devnet.solana.com'],
+    testnet: ['https://api.testnet.solana.com'],
+  };
   const MEMO_PROGRAM_IDS = new Set([
     'MemoSq4gqABAXKb96qnH8TysNcWxMyWCqXgDLGmfcHr', // v2
     'Memo1UhkJRfHyvLMcVucJwxXeuD728EqVDDwQDxFMNo', // v1
@@ -440,41 +448,69 @@
 
   // ---------- Core: fetch transaction ----------
   async function loadTx(signature) {
-    // Build endpoint list: custom ?rpc= first, then defaults.
     const customRpcs = params.getAll('rpc').map(s => s.trim()).filter(Boolean);
-    const endpoints = [...customRpcs, ...DEFAULT_RPC_ENDPOINTS];
+    const cluster = (params.get('cluster') || 'all').toLowerCase();
 
-    console.info('[MemoViewer v1.1] Signature:', signature);
-    console.info('[MemoViewer v1.1] Endpoints to try:', endpoints);
+    // Build ordered list: custom > mainnet > devnet > testnet  (or just one cluster)
+    const endpoints = [];
+    for (const u of customRpcs) endpoints.push({ url: u, cluster: 'custom' });
+    const pushCluster = (c) => CLUSTER_ENDPOINTS[c]?.forEach(u => endpoints.push({ url: u, cluster: c }));
+    if (cluster === 'all') { pushCluster('mainnet'); pushCluster('devnet'); pushCluster('testnet'); }
+    else if (CLUSTER_ENDPOINTS[cluster]) pushCluster(cluster);
+    else pushCluster('mainnet');
+
+    console.info('[MemoViewer v1.2] Signature:', signature);
+    console.info('[MemoViewer v1.2] Cluster mode:', cluster, '| Endpoints:', endpoints);
 
     const failures = [];
-    for (const url of endpoints) {
+    let sawNull = false;     // at least one RPC cleanly said "not found"
+    let foundCluster = null;
+
+    for (const { url, cluster: c } of endpoints) {
       try {
-        console.info('[MemoViewer] → trying', url);
+        console.info('[MemoViewer] → trying', c, url);
         const data = await rpc(url, 'getTransaction', [
           signature,
           { encoding: 'jsonParsed', maxSupportedTransactionVersion: 0, commitment: 'confirmed' },
         ]);
         if (!data) {
           console.warn('[MemoViewer] ← null from', url);
-          failures.push({ url, msg: 'null (nicht gefunden / noch nicht bestätigt)' });
+          sawNull = true;
+          failures.push({ url, cluster: c, msg: 'null (TX auf diesem Cluster nicht gefunden)' });
           continue;
         }
-        console.info('[MemoViewer] ✓ got data from', url);
-        render(signature, data);
+        console.info('[MemoViewer] ✓ got data from', url, 'on cluster', c);
+        foundCluster = c;
+        render(signature, data, c);
         return;
       } catch (err) {
         console.warn('[MemoViewer] ✗ failed at', url, '→', err && err.message);
-        failures.push({ url, msg: (err && err.message) ? err.message : String(err) });
+        failures.push({ url, cluster: c, msg: (err && err.message) ? err.message : String(err) });
       }
     }
-    // All endpoints failed or returned null
-    const detail = failures.map(f => '• ' + shortUrl(f.url) + ' → ' + f.msg).join('\n');
+
+    // Nothing worked — build a diagnosis
+    const detail = failures.map(f => '• [' + f.cluster + '] ' + shortUrl(f.url) + ' → ' + f.msg).join('\n');
+    let diagnosis = '';
+
+    if (sawNull) {
+      // At least one RPC spoke to us cleanly — so the signature is reachable,
+      // it just doesn't exist (on that cluster, at that commitment, or anymore).
+      diagnosis = '\n\nDiagnose: Mindestens ein RPC hat geantwortet, aber die Transaktion nicht gefunden.\n' +
+        'Drei mögliche Ursachen:\n' +
+        '  1) Die TX ist älter als ~2–4 Tage und aus den öffentlichen RPCs herausgerollt. Öffentliche Solana-Nodes halten nur die letzten ~2 Epochs vor. Für ältere TXs brauchst du einen Archive-RPC (Helius, QuickNode, Chainstack).\n' +
+        '  2) Die TX liegt auf einem anderen Cluster (devnet/testnet).\n' +
+        '  3) Die Signatur wurde nie auf Mainnet submittet.';
+    }
+
     const localHint = location.protocol === 'file:'
-      ? '\n\nHinweis: Du öffnest die Datei via file:// lokal. In diesem Modus sendet der Browser "Origin: null", was viele öffentliche RPCs blockieren. Deploye die Seite auf GitHub Pages oder teste über einen lokalen HTTP-Server (z.B. `python -m http.server`).'
+      ? '\n\nHinweis: Du öffnest die Datei via file://. Viele RPCs blockieren Origin "null".'
       : '';
-    const customHint = '\n\nDu kannst über ?rpc=https://dein-endpoint einen eigenen RPC (z.B. Helius) angeben.';
-    throw new Error('Keine RPC antwortete:\n' + detail + localHint + customHint);
+    const customHint = '\n\nMit Archive-RPC (empfohlen bei älteren TXs): ' +
+      '\n  …/?sig=' + (signature.slice(0,10) + '…') +
+      '&rpc=https://mainnet.helius-rpc.com/?api-key=DEIN_KEY';
+
+    throw new Error('Keine RPC lieferte Daten:\n' + detail + diagnosis + localHint + customHint);
   }
 
   function shortUrl(u) {
@@ -504,8 +540,15 @@
   }
 
   // ---------- Rendering ----------
-  function render(signature, tx) {
+  function render(signature, tx, cluster) {
     showView('result');
+
+    // network badge reflects where we found it
+    if (cluster && cluster !== 'custom') {
+      const nb = document.getElementById('network-badge');
+      nb.innerHTML = '<span class="dot"></span>' + cluster;
+      if (cluster !== 'mainnet') nb.classList.add('warn');
+    }
 
     // --- tx meta ---
     $('tx-sig').textContent = signature;
