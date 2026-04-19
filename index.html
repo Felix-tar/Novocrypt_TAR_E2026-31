@@ -263,23 +263,27 @@
     <header class="site">
       <div class="brand">
         <span class="logo">◎</span>
-        <span>Solana Memo Viewer <small>on-chain payload · v1.2</small></span>
+        <span>Solana Memo Viewer <small>on-chain payload · v1.3</small></span>
       </div>
       <span id="network-badge" class="badge"><span class="dot"></span>mainnet-beta</span>
     </header>
 
+    <!-- Persistent signature input -->
+    <section class="card" id="persistent-search" style="padding: 12px;">
+      <div class="form" style="margin-top: 0;">
+        <input id="top-sig-input" type="text" placeholder="Transaktionssignatur eingeben…" autocomplete="off" spellcheck="false" />
+        <button class="btn primary" id="top-sig-go">Anzeigen</button>
+      </div>
+    </section>
+
     <!-- Landing / no signature -->
     <section id="view-empty" class="card hidden">
-      <h2 class="section" style="margin-bottom: 6px;">Keine Signatur angegeben</h2>
+      <h2 class="section" style="margin-bottom: 6px;">Bereit</h2>
       <p class="help" style="margin-top: 0;">
-        Füge eine Solana-Transaktionssignatur an die URL an, z.&nbsp;B.
-        <code style="font-family:var(--mono);">?sig=DEINE_SIG</code>,
-        oder gib sie hier ein:
+        Gib oben eine Transaktionssignatur ein oder rufe die Seite mit
+        <code style="font-family:var(--mono);">?sig=DEINE_SIG</code> auf,
+        z.&nbsp;B. aus einem QR-Code.
       </p>
-      <div class="form">
-        <input id="sig-input" type="text" placeholder="Transaktionssignatur (base58)…" autocomplete="off" spellcheck="false" />
-        <button class="btn primary" id="sig-go">Anzeigen</button>
-      </div>
     </section>
 
     <!-- Loading -->
@@ -382,16 +386,23 @@
   // Also: ?cluster=mainnet|devnet|testnet controls which set is tried.
   // `all` (default) tries mainnet first, then devnet, then testnet – so a test-tx on devnet
   // still gets found without the user having to know the cluster.
+  //
+  // SECURITY NOTE: The Helius key below is publicly visible in the page source.
+  // Restrict it in the Helius dashboard to your GitHub Pages origin (Allowed Origins)
+  // to prevent abuse. 100k requests/day free tier is plenty for QR-code scans.
+  const HELIUS_KEY = 'f7d0d8e0-5e0e-4b25-9fa0-2daae6de0e38';
   const CLUSTER_ENDPOINTS = {
     mainnet: [
-      'https://mainnet.helius-rpc.com/?api-key=a9469c6f-61bd-41d8-b739-9fb73adea245
+      'https://mainnet.helius-rpc.com/?api-key=' + HELIUS_KEY,   // archive-capable, primary
       'https://solana-rpc.publicnode.com',
       'https://api.mainnet-beta.solana.com',
       'https://solana.api.onfinality.io/public',
-      'https://solana-mainnet.g.alchemy.com/v2/demo',
       'https://endpoints.omniatech.io/v1/sol/mainnet/public',
     ],
-    devnet:  ['https://api.devnet.solana.com'],
+    devnet:  [
+      'https://devnet.helius-rpc.com/?api-key=' + HELIUS_KEY,
+      'https://api.devnet.solana.com',
+    ],
     testnet: ['https://api.testnet.solana.com'],
   };
   const MEMO_PROGRAM_IDS = new Set([
@@ -415,16 +426,21 @@
   const params = new URLSearchParams(location.search);
   const sig = (params.get('sig') || params.get('signature') || '').trim();
 
-  // Landing form handler
-  $('sig-go').addEventListener('click', () => {
-    const v = $('sig-input').value.trim();
+  // Pre-fill the persistent top input with the current signature
+  if (sig) document.getElementById('top-sig-input').value = sig;
+
+  // Persistent top input handler — always available
+  const topInput = $('top-sig-input');
+  const topGo = $('top-sig-go');
+  topGo.addEventListener('click', () => {
+    const v = topInput.value.trim();
     if (v) {
       const u = new URL(location.href);
       u.searchParams.set('sig', v);
       location.href = u.toString();
     }
   });
-  $('sig-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('sig-go').click(); });
+  topInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') topGo.click(); });
 
   if (!sig) {
     showView('empty');
@@ -459,8 +475,8 @@
     else if (CLUSTER_ENDPOINTS[cluster]) pushCluster(cluster);
     else pushCluster('mainnet');
 
-    console.info('[MemoViewer v1.2] Signature:', signature);
-    console.info('[MemoViewer v1.2] Cluster mode:', cluster, '| Endpoints:', endpoints);
+    console.info('[MemoViewer v1.3] Signature:', signature);
+    console.info('[MemoViewer v1.3] Cluster mode:', cluster, '| Endpoints:', endpoints);
 
     const failures = [];
     let sawNull = false;     // at least one RPC cleanly said "not found"
