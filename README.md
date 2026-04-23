@@ -11,12 +11,17 @@ Die Bedienung erfolgt über drei einzelne Softwarekomponenten: eine für den Pr�
 ### Aktueller Status
 - Software: funktionsfähig und einsatzbereit  
 – Die Hardware ist fertig montiert.
-- Dokumentation: Erstellung der Abschlussarbeit aktuell in Bearbeitung  
+- Dokumentation: abgegeben 23.4.
+   
 
-**Nächstes Update:**  
-nach theorieprüfung 
-
----
+## Ausblick
+Weiterentwicklung durch Fragmentierung des aktuellen Protokolls. 
+Problem: Begrenzte Bytegröße der Solana-Transaktionen.
+Lösung: Aufteilung des Protokolls in mehrere Fragmente und anschließendes sequenzielles Laden.
+Bei einer Größe von ca. 7 kB sind etwa 10–20 Transaktionen pro Protokoll erforderlich.
+Dennoch ist dieses Verfahren schneller und kostengünstiger als die Nutzung von ArDrive.
+Die Implementierung der Fragmentierungslogik erfolgt nach Pfingsten.
+Infolgedessen sind Anpassungen im Readings Tab sowie in der Kundensoftware erforderlich.
 
 ## Projektupdates
 ### Update – 19.04.2026
